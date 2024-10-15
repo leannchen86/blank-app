@@ -16,8 +16,8 @@ from langchain_openai import ChatOpenAI
 load_dotenv()
 
 neo4j_uri = os.getenv("NEO4J_URI", "neo4j+s://1aac1f7e.databases.neo4j.io")
-neo4j_username = os.getenv("NEO4J_USERNAME", "neo4j")
-neo4j_password = os.getenv("NEO4J_PASSWORD", "hU3vm5JQ0uBiEpRs8N6xvCJqDXGviCoXcGf9Tevn4wg")
+neo4j_username = st.secrets["neo4j_username"]
+neo4j_password = st.secrets["neo4j_password"]
 
 OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
 DIFFBOT_API_KEY = st.secrets["DIFFBOT_API_KEY"]
