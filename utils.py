@@ -1,5 +1,6 @@
 from typing import Any, Dict, List, Tuple
 import streamlit as st
+import os
 from langchain_community.graphs import Neo4jGraph
 from langchain_community.vectorstores import Neo4jVector
 from langchain_community.vectorstores.neo4j_vector import remove_lucene_chars
@@ -13,10 +14,12 @@ index_name = "news_vector"
 keyword_index_name = "news_fulltext"
 entity_keyword_index = "entity"
 
-llm = ChatOpenAI(temperature=0, model="gpt-4-turbo", streaming=True)
-
 OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
+os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
 DIFFBOT_API_KEY = st.secrets["DIFFBOT_API_KEY"]
+os.environ["DIFFBOT_API_KEY"] = DIFFBOT_API_KEY
+
+llm = ChatOpenAI(temperature=0, model="gpt-4-turbo", streaming=True)
 
 def setup_indices():
     graph.query(

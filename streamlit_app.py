@@ -5,7 +5,7 @@ from langchain_community.graphs import Neo4jGraph
 import requests
 from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
-from utils import graph, embeddings, text_splitter
+from utils import graph, embeddings, text_splitter, llm
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from enhance import process_entities, store_enhanced_data
@@ -15,13 +15,14 @@ from langchain_openai import ChatOpenAI
 
 load_dotenv()
 
-neo4j_uri = os.getenv("NEO4J_URI", "neo4j+s://1aac1f7e.databases.neo4j.io")
-neo4j_username = st.secrets["neo4j_username"]
-neo4j_password = st.secrets["neo4j_password"]
+NEO4J_URI = os.getenv("NEO4J_URI", "neo4j+s://1aac1f7e.databases.neo4j.io")
+NEO4J_USERNAME = st.secrets["NEO4J_USERNAME"]
+NEO4J_PASSWORD = st.secrets["NEO4J_PASSWORD"]
 
 OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
+os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
 DIFFBOT_API_KEY = st.secrets["DIFFBOT_API_KEY"]
-
+os.environ["DIFFBOT_API_KEY"] = DIFFBOT_API_KEY
 
 MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4-turbo")
 DATA_FILE = os.getenv("DATA_FILE", "survey_responses.json")
@@ -44,14 +45,12 @@ if 'organizations' not in st.session_state:
 if 'selected_org' not in st.session_state:
     st.session_state.selected_org = None
 
-def search_organizations(query: str, tag: Optional[str] = None, size: int = 5) -> Dict[str, Any]:
+def search_organizations(query: str, size: int = 5) -> Dict[str, Any]:
     """
     Fetch relevant organizations from Diffbot KG endpoint
     """
     search_host = "https://kg.diffbot.com/kg/v3/dql?"
-    search_query = f'type:Organization name:"{query}" sortBy:employeeCount'
-    if tag:
-        search_query += f' tags.label:"{tag}"'
+    search_query = f'type:Organization name:"{query}"'
     url = f"{search_host}query={search_query}&token={os.environ['DIFFBOT_API_KEY']}&size={size}"
     
     try:
@@ -61,20 +60,6 @@ def search_organizations(query: str, tag: Optional[str] = None, size: int = 5) -
     except requests.RequestException as e:
         st.error(f"API request failed: {e}")
         return None
-
-def get_industry_tags() -> List[str]:
-    """
-    Fetch industry tags from Diffbot
-    """
-    url = f"https://kg.diffbot.com/kg/v3/dql?query=type:Industry&token={os.environ['DIFFBOT_API_KEY']}&size=100"
-    try:
-        response = requests.get(url)
-        response.raise_for_status()
-        data = response.json()
-        return [industry['entity']['name'] for industry in data.get('data', [])]
-    except requests.RequestException as e:
-        st.error(f"Failed to fetch industry tags: {e}")
-        return []
 
 def generate_survey_objectives(org_info: Dict, articles: List[Dict]) -> List[str]:
     prompt = ChatPromptTemplate.from_messages([
@@ -128,13 +113,11 @@ def main():
     # Step 1: User provides company name
     if st.session_state.step == 1:
         company_name = st.text_input("Enter company name:")
-        industry_tags = get_industry_tags()
-        selected_industry = st.selectbox("Select industry (optional):", [""] + industry_tags)
 
         if st.button("Search Organizations"):
             if company_name:
                 with st.spinner("Searching for organizations..."):
-                    st.session_state.organizations = search_organizations(company_name, selected_industry)
+                    st.session_state.organizations = search_organizations(company_name)
                 if st.session_state.organizations and 'data' in st.session_state.organizations:
                     st.session_state.step = 2
                 else:
@@ -143,6 +126,7 @@ def main():
                 st.warning("Please enter a company name.")
 
     # Step 2: User selects correct organization
+    # TBD - need to list out locations to narrow down
     if st.session_state.step == 2:
         if st.session_state.organizations and 'data' in st.session_state.organizations:
             options = st.session_state.organizations['data']
